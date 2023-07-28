@@ -37,6 +37,7 @@ def status():
     return result
 
 def setup(domain, username, password, school):
+    workgroup = domain.split(".")[0]
     print()
     print("Copy template for new krb5.conf... ", end="")
     with open("/var/lib/linuxmuster-fileserver/krb5.conf.example", "r") as f:
@@ -66,7 +67,7 @@ def setup(domain, username, password, school):
         content = f.read()
         content = content.replace("%%DOMAIN%%", domain)
         content = content.replace("%%HOSTNAME%%", socket.gethostname())
-        content = content.replace("%%WORKGROUP%%", domain.split(".")[0])
+        content = content.replace("%%WORKGROUP%%", workgroup)
         with open("/etc/samba/smb.conf", "w") as r:
             r.write(content)
     if os.path.exists("/etc/samba/smb.conf"):
@@ -87,11 +88,11 @@ def setup(domain, username, password, school):
     path = "/srv/samba/schools/" + school
     os.makedirs(path, exist_ok=True)
     __execute(["/usr/bin/net", "conf", "addshare", school, path])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"'Share for {school}"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator,", f"'@{workgroup}\\SCHOOLS"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"'Share for {school}'"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator',", f"'@{workgroup}\\SCHOOLS'"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'read only'", "no"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'hide unreadable'", "yes"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator,"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator',"])
     __execute(["/usr/sbin/quotacheck", "-cumg", path])
     __execute(["/usr/sbin/quotaon", path])
 
