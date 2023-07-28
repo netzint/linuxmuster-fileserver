@@ -66,7 +66,7 @@ def setup(domain, username, password, school):
     with open("/var/lib/linuxmuster-fileserver/smb.conf.example", "r") as f:
         content = f.read()
         content = content.replace("%%DOMAIN%%", domain)
-        content = content.replace("%%HOSTNAME%%", socket.gethostname())
+        content = content.replace("%%HOSTNAME%%", socket.gethostname().upper())
         content = content.replace("%%WORKGROUP%%", workgroup)
         with open("/etc/samba/smb.conf", "w") as r:
             r.write(content)
@@ -92,7 +92,7 @@ def setup(domain, username, password, school):
     __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator',", f"'@{workgroup}\\SCHOOLS'"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'read only'", "no"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'hide unreadable'", "yes"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator',"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator'"])
     __execute(["/usr/sbin/quotacheck", "-cumg", path])
     __execute(["/usr/sbin/quotaon", path])
 
@@ -124,7 +124,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command")
     parserSetup = subparsers.add_parser("setup", help="Setup a new fileserver")
-    parserSetup.add_argument("-d", "--domain", required=True, help='Linuxmuster domain name (eg. linuxmuster.lan)', default="linuxmuster.lan")
+    parserSetup.add_argument("-d", "--domain", required=False, help='Linuxmuster domain name (eg. linuxmuster.lan)', default="linuxmuster.lan")
     #parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
     parserSetup.add_argument("-u", "--username", required=False, help='Username of user with join permissions', default="global-admin")
     parserSetup.add_argument("-p", "--password", required=False, help='Password of user with join permissions')
