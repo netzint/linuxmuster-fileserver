@@ -6,6 +6,6 @@ Build-Depends: debhelper (>= 4.0.0), fakeroot
 
 Package: linuxmuster-fileserver
 Architecture: all
-Depends: samba krb5-user krb5-config winbind libpam-winbind libnss-winbind ntp acl quota
+Depends: samba, krb5-user, krb5-config, winbind, libpam-winbind, libnss-winbind, ntp, acl, quota
 Homepage: www.netzint.de
 Description: Linuxmuster Fileserver
