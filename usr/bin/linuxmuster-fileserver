@@ -36,7 +36,8 @@ def status():
 
     return result
 
-def setup(domain, workgroup, username, password, school):
+def setup(domain, username, password, school):
+    print()
     print("Copy template for new krb5.conf... ", end="")
     with open("/var/lib/linuxmuster-fileserver/krb5.conf.example", "r") as f:
         content = f.read()
@@ -65,7 +66,7 @@ def setup(domain, workgroup, username, password, school):
         content = f.read()
         content = content.replace("%%DOMAIN%%", domain)
         content = content.replace("%%HOSTNAME%%", socket.gethostname())
-        content = content.replace("%%WORKGROUP%%", workgroup)
+        content = content.replace("%%WORKGROUP%%", domain.split(".")[0])
         with open("/etc/samba/smb.conf", "w") as r:
             r.write(content)
     if os.path.exists("/etc/samba/smb.conf"):
@@ -75,8 +76,8 @@ def setup(domain, workgroup, username, password, school):
         exit(1)
 
     print("Try to join domain with given data... ", end="")
-    command = __execute(["/usr/bin/net", "ads", "join", "-U", username + "%" + password])
-    if command.stderr.decode() == "":
+    __execute(["/usr/bin/net", "ads", "join", "-U", username + "%" + password])
+    if "Join is OK" in __execute(["/usr/bin/net", "ads", "testjoin"]).stdout.decode():
         print("✅")
     else:
         print("❌")
@@ -87,7 +88,7 @@ def setup(domain, workgroup, username, password, school):
     os.makedirs(path, exist_ok=True)
     __execute(["/usr/bin/net", "conf", "addshare", school, path])
     __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"'Share for {school}"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator,", f"'{workgroup}\\SCHOOLS"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator,", f"'@{workgroup}\\SCHOOLS"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'read only'", "no"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'hide unreadable'", "yes"])
     __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator,"])
@@ -114,7 +115,7 @@ def setup(domain, workgroup, username, password, school):
     else:
         print("❌")
 
-    print("\n Setup finished successfully!\n")
+    return "\nSetup finished successfully!\n"
 
 def main():
     parser = argparse.ArgumentParser()
@@ -122,11 +123,11 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command")
     parserSetup = subparsers.add_parser("setup", help="Setup a new fileserver")
-    parserSetup.add_argument("-d", "--domain", required=True, help='Linuxmuster domain name')
-    parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
-    parserSetup.add_argument("-u", "--username", required=True, help='Username of user with join permissions')
+    parserSetup.add_argument("-d", "--domain", required=True, help='Linuxmuster domain name (eg. linuxmuster.lan)', default="linuxmuster.lan")
+    #parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
+    parserSetup.add_argument("-u", "--username", required=False, help='Username of user with join permissions', default="global-admin")
     parserSetup.add_argument("-p", "--password", required=False, help='Password of user with join permissions')
-    parserSetup.add_argument("-s", "--school", required=False, help='Schoolshortcut for this fileserver')
+    parserSetup.add_argument("-s", "--school", required=False, help='Schoolshortcut for this fileserver', default="default-school")
 
     subparsers.add_parser("status", help="Status of caching server(s)")
 
@@ -151,7 +152,7 @@ def main():
             password = input("Please enter password for %s@%s: " % (args.username, args.domain))
         else:
             password = args.password
-        print(setup(args.domain, args.workgroup, args.username, password, args.school))
+        print(setup(args.domain.upper(), args.username, password, args.school.lower()))
     elif args.command == "status":
         print(status())
     else:
