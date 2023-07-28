@@ -88,11 +88,11 @@ def setup(domain, username, password, school):
     path = "/srv/samba/schools/" + school
     os.makedirs(path, exist_ok=True)
     __execute(["/usr/bin/net", "conf", "addshare", school, path])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"'Share for {school}'"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator',", f"'@{workgroup}\\SCHOOLS'"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'read only'", "no"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'hide unreadable'", "yes"])
-    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator'"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"Share for {school}"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "valid users", f"{workgroup}\\administrator,@{workgroup}\\SCHOOLS"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "read only", "no"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "hide unreadable", "yes"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "admin users", f"{workgroup}\\administrator"])
     __execute(["/usr/sbin/quotacheck", "-cumg", path])
     __execute(["/usr/sbin/quotaon", path])
 
@@ -128,7 +128,7 @@ def main():
     #parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
     parserSetup.add_argument("-u", "--username", required=False, help='Username of user with join permissions', default="global-admin")
     parserSetup.add_argument("-p", "--password", required=False, help='Password of user with join permissions')
-    parserSetup.add_argument("-s", "--school", required=False, help='Schoolshortcut for this fileserver', default="default-school")
+    parserSetup.add_argument("-s", "--school", required=True, help='Schoolshortcut for this fileserver')
 
     subparsers.add_parser("status", help="Status of caching server(s)")
 
@@ -150,7 +150,7 @@ def main():
 
     if args.command == "setup":
         if not args.password:
-            password = input("Please enter password for %s@%s: " % (args.username, args.domain))
+            password = input("Please enter password for %s@%s: " % (args.username, args.domain.upper()))
         else:
             password = args.password
         print(setup(args.domain.upper(), args.username, password, args.school.lower()))
