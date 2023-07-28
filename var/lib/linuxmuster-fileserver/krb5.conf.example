@@ -1,0 +1,11 @@
+[libdefaults]
+        default_realm = %%DOMAIN%%
+ 
+# The following krb5.conf variables are only for MIT Kerberos.
+ 
+        dns_lookup_realm = true
+        dns_lookup_kdc = true
+        kdc_timesync = 1
+        ccache_type = 4
+        forwardable = true
+        proxiable = true 

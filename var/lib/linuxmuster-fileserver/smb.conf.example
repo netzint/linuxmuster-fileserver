@@ -1,0 +1,14 @@
+[global]
+  netbios name = %%HOSTNAME%%
+  security = ADS
+  workgroup = %%WORKGROUP%%
+  realm = %%DOMAIN%%
+ 
+  registry shares = yes
+ 
+  idmap config * : backend = autorid
+  idmap config * : range = 100000000-199999999
+  idmap config * : rangesize = 10000000
+ 
+ 
+  vfs objects = acl_xattr 

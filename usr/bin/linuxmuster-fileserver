@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+
+#########################################################
+# 
+# by Netzint GmbH 2023
+# Lukas Spitznagel (lukas.spitznagel@netzint.de)
+# 
+#########################################################
+
+import argparse
+import subprocess
+import socket
+import os.path
+import os
+
+from subprocess import PIPE
+
+def __execute(command):
+    return subprocess.run(command, stdout=PIPE, stderr=PIPE)
+
+def status():
+    smbdstatus = __execute(["/usr/bin/systemctl", "status", "smbd"])
+    winbindstatus = __execute(["/usr/bin/systemctl", "status", "winbind"])
+    
+    result = "\nChecking status for linuxmuster-fileserver services:\n"
+
+    if "running" in smbdstatus.stdout.decode():
+        result += "✅ smbd is up an running!\n"
+    else:
+        result += "❌ smbd is inactive or dead!\n"
+
+    if "running" in winbindstatus.stdout.decode():
+        result += "✅ winbind is up an running!\n"
+    else:
+        result += "❌ winbind is inactive or dead!\n"
+
+    return result
+
+def setup(domain, workgroup, username, password, school):
+    print("Copy template for new krb5.conf... ", end="")
+    with open("/var/lib/linuxmuster-fileserver/krb5.conf.example", "r") as f:
+        content = f.read()
+        content = content.replace("%%DOMAIN%%", domain)
+        with open("/etc/krb5.conf", "w") as r:
+            r.write(content)
+    if os.path.exists("/etc/krb5.conf"):
+        print("✅")
+    else:
+        print("❌")
+        exit(1)
+    
+    print("Copy template for new nsswitch.conf... ", end="")
+    with open("/var/lib/linuxmuster-fileserver/nsswitch.conf.example", "r") as f:
+        content = f.read()
+        with open("/etc/nsswitch.conf", "w") as r:
+            r.write(content)
+    if os.path.exists("/etc/nsswitch.conf"):
+        print("✅")
+    else:
+        print("❌")
+        exit(1)
+
+    print("Copy template for new smb.conf... ", end="")
+    with open("/var/lib/linuxmuster-fileserver/smb.conf.example", "r") as f:
+        content = f.read()
+        content = content.replace("%%DOMAIN%%", domain)
+        content = content.replace("%%HOSTNAME%%", socket.gethostname())
+        content = content.replace("%%WORKGROUP%%", workgroup)
+        with open("/etc/samba/smb.conf", "w") as r:
+            r.write(content)
+    if os.path.exists("/etc/samba/smb.conf"):
+        print("✅")
+    else:
+        print("❌")
+        exit(1)
+
+    print("Try to join domain with given data... ", end="")
+    command = __execute(["/usr/bin/net", "ads", "join", "-U", username + "%" + password])
+    if command.stderr.decode() == "":
+        print("✅")
+    else:
+        print("❌")
+        exit(1)
+
+    print("Create share for school on this fileserver... ", end="")
+    path = "/srv/samba/schools/" + school
+    os.makedirs(path, exist_ok=True)
+    __execute(["/usr/bin/net", "conf", "addshare", school, path])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "comment", f"'Share for {school}"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'valid users'", f"'{workgroup}\\administrator,", f"'{workgroup}\\SCHOOLS"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'read only'", "no"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'hide unreadable'", "yes"])
+    __execute(["/usr/bin/net", "conf", "setparm", school, "'admin users'", f"'{workgroup}\\administrator,"])
+    __execute(["/usr/sbin/quotacheck", "-cumg", path])
+    __execute(["/usr/sbin/quotaon", path])
+
+    if school in __execute(["/usr/bin/net", "conf", "list"]).stdout.decode():
+        print("✅")
+    else:
+        print("❌")
+        exit(1)
+
+    print("Restart service smbd.... ", end="")
+    __execute(["/usr/bin/systemctl", "restart", "smbd"])
+    if "running" in __execute(["/usr/bin/systemctl", "status", "smbd"]).stdout.decode():
+        print("✅")
+    else:
+        print("❌")
+
+    print("Restart service winbind.... ", end="")
+    __execute(["/usr/bin/systemctl", "restart", "winbind"])
+    if "running" in __execute(["/usr/bin/systemctl", "status", "winbind"]).stdout.decode():
+        print("✅")
+    else:
+        print("❌")
+
+    print("\n Setup finished successfully!\n")
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", required=False, help="Print debug output", action="store_true")
+
+    subparsers = parser.add_subparsers(dest="command")
+    parserSetup = subparsers.add_parser("setup", help="Setup a new fileserver")
+    parserSetup.add_argument("-d", "--domain", required=True, help='Linuxmuster domain name')
+    parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
+    parserSetup.add_argument("-u", "--username", required=True, help='Username of user with join permissions')
+    parserSetup.add_argument("-p", "--password", required=False, help='Password of user with join permissions')
+    parserSetup.add_argument("-s", "--school", required=False, help='Schoolshortcut for this fileserver')
+
+    subparsers.add_parser("status", help="Status of caching server(s)")
+
+    args = parser.parse_args()
+
+    print("""
+=======================================================================
+    _     ___ _   _ _   ___  ____  __ _   _ ____ _____ _____ ____  
+   | |   |_ _| \ | | | | \ \/ /  \/  | | | / ___|_   _| ____|  _ \ 
+   | |    | ||  \| | | | |\  /| |\/| | | | \___ \ | | |  _| | |_) |
+   | |___ | || |\  | |_| |/  \| |  | | |_| |___) || | | |___|  _ < 
+   |_____|___|_| \_|\___//_/\_\_|  |_|\___/|____/ |_| |_____|_| \_\ 
+
+
+   Commandline-Tool to configure and manage LINUXMUSTER-Fileserver!
+
+=======================================================================
+    """)
+
+    if args.command == "setup":
+        if not args.password:
+            password = input("Please enter password for %s@%s: " % (args.username, args.domain))
+        else:
+            password = args.password
+        print(setup(args.domain, args.workgroup, args.username, password, args.school))
+    elif args.command == "status":
+        print(status())
+    else:
+        parser.print_help()
+
+
+
+if __name__ == "__main__":
+    main()

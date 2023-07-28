@@ -1,0 +1,14 @@
+passwd:         compat systemd winbind
+group:          compat systemd winbind
+shadow:         compat
+gshadow:        files
+ 
+hosts:          files mdns4_minimal dns
+networks:       files
+ 
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+ 
+netgroup:       nis 
