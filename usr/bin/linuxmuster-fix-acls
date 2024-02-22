@@ -14,13 +14,9 @@ else
     SCHOOL="$1"
 fi
 
-for folder in "iso" "management" "program" "share/classes" "share/management" "share/projects" "share/school" "share/teachers" "students" "teachers"; do
+for folder in "share/classes" "share/management" "share/projects" "share/school" "share/teachers" "students" "teachers"; do
     echo -n "Reparing ACLs for '$folder'... "
     cd "/srv/samba/schools/$SCHOOL/$folder"
-    if [ $? -eq 0 ]; then
-        find ./* -maxdepth 0 -type d -exec /usr/bin/linuxmuster-set-recursive-acl {} \;#
-        echo "[OK]"
-    else
-        echo "[ERROR] Folder not found!"
-    fi
+    find ./* -maxdepth 0 -type d -exec /usr/bin/linuxmuster-set-recursive-acl {} \;
+    echo "[OK]"
 done
