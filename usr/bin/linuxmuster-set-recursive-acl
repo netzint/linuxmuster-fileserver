@@ -7,7 +7,7 @@
 # 
 #########################################################
 
-if [ $1 == "" ]; then
+if [ "$1" == "" ]; then
     echo "No argumentes provided...!"
     echo ""
     echo "linuxmuster-set-recursive-acl <FOLDER>"
@@ -15,19 +15,19 @@ if [ $1 == "" ]; then
 fi
 
 echo -n "Get ACLs from provided folder... "
-getfacl $1 > $1.folder.ntacl
-getfacl $1 | grep -v "^default" > $1.files.ntacl
+getfacl "$1" > "$1".folder.ntacl
+getfacl "$1" | grep -v "^default" > "$1".files.ntacl
 echo "[OK]"
 
 echo -n "Set ACLs for all folders in path '$1'... "
-find ./$1* -type d -exec setfacl --set-file=$1.folder.ntacl {} \;
+find ./"$1"* -type d -exec setfacl --set-file="$1".folder.ntacl {} \;
 echo "[OK]"
 
 echo -n "Set ACLs for all files in path '$1'... "
-find ./$1* -type f -exec setfacl --set-file=$1.files.ntacl {} \;
+find ./"$1"* -type f -exec setfacl --set-file="$1".files.ntacl {} \;
 echo "[OK]"
 
 echo -n "Remove ACL templates..."
-rm $1.folder.ntacl
-rm $1.files.ntacl
+rm "$1".folder.ntacl
+rm "$1".files.ntacl
 echo "[OK]"
