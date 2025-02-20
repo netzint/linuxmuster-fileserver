@@ -1,22 +1,210 @@
 #!/bin/bash
 
-#########################################################
-# 
-# by Netzint GmbH 2023
-# Lukas Spitznagel (lukas.spitznagel@netzint.de)
-# 
-#########################################################
+: '
+#####################################################################
+by Netzint GmbH 2025
+Lukas Spitznagel (lukas.spitznagel@netzint.de)
 
-if [ "$1" == "" ]; then
-    echo "No share provided. Falling back to default-school..."
-    SCHOOL="default-school"
-else
-    SCHOOL="$1"
+This script sets all ACls recursively for all files and folders. It 
+is important to repair the folder permissions in advance 
+using "sophomorix-repair"!
+
+Home-Directories:
+  - /srv/samba/school/<SCHOOL>/teachers/<USERNAME> -> ACLs from <USERNAME>
+  - /srv/samba/school/<SCHOOL>/students/<CLASS>/<USERNAME> -> ACLs from <USERNAME>
+
+Share-Directories:
+  - /srv/samba/school/<SCHOOL>/share/classes/<CLASS> -> ACLs from <CLASS>
+  - /srv/samba/school/<SCHOOL>/share/projects/<PROJECT> -> ACLs from <PROJECT>
+  - /srv/samba/school/<SCHOOL>/share/management -> ACLs from management
+  - /srv/samba/school/<SCHOOL>/share/school -> ACLs from school
+  - /srv/samba/school/<SCHOOL>/share/teachers -> ACLs from teachers
+
+#####################################################################
+'
+
+if [[ -z $1 ]]; then
+  echo "Keine Schule als Parameter angegeben!"
+  echo "./$0 <SCHULE>"
+  exit 1
 fi
 
-for folder in "share/classes" "share/management" "share/projects" "share/school" "share/teachers" "students" "teachers"; do
-    echo -n "Reparing ACLs for '$folder'... "
-    cd "/srv/samba/schools/$SCHOOL/$folder"
-    find ./* -maxdepth 0 -type d -exec /usr/bin/linuxmuster-set-recursive-acl {} \;
-    echo "[OK]"
-done
+# Basisverzeichnisse
+TEACHERS_DIR="/srv/samba/schools/$1/teachers"
+STUDENTS_DIR="/srv/samba/schools/$1/students"
+SHARE_DIR="/srv/samba/schools/$1/share"
+
+# Funktion zum Bereinigen der ACLs
+clean_acl() {
+    local acl_data="$1"
+    local type="$2"
+
+    if [[ "$type" == "dir" ]]; then
+        # Entferne alle Zeilen mit "040rights"
+        echo "$acl_data" | grep -v "040rights"
+    elif [[ "$type" == "file" ]]; then
+        # Entferne alle "default" ACL-Einträge
+        echo "$acl_data" | grep -v "^default:"
+    else
+        echo "$acl_data"  # Falls kein Filter notwendig ist
+    fi
+}
+
+# Funktion zum Setzen der ACLs für einen Benutzerordner
+set_acls_for_user_folder() {
+    local user_folder="$1"
+
+    # ACL des Benutzerverzeichnisses speichern und bereinigen
+    acl_user_folder=$(getfacl -p "$user_folder" 2>/dev/null)
+    if [[ -z "$acl_user_folder" ]]; then
+        echo "Fehler: Kann ACL von $user_folder nicht abrufen!"
+        return
+    fi
+    acl_user_folder_cleaned=$(clean_acl "$acl_user_folder" "dir")
+
+    # ACL des Transfer-Ordners speichern und bereinigen (falls vorhanden)
+    transfer_folder="$user_folder/transfer"
+    if [[ -d "$transfer_folder" ]]; then
+        acl_transfer=$(getfacl -p "$transfer_folder" 2>/dev/null)
+        if [[ -z "$acl_transfer" ]]; then
+            echo "Fehler: Kann ACL von $transfer_folder nicht abrufen!"
+            return
+        fi
+        acl_transfer_cleaned=$(clean_acl "$acl_transfer" "dir")
+    else
+        acl_transfer_cleaned=""
+    fi
+
+    # Rekursive ACL-Übernahme für Unterordner
+    find "$user_folder" -mindepth 1 -type d | while read -r dir; do
+        if [[ "$dir" == "$transfer_folder"* ]]; then
+            if [[ -n "$acl_transfer_cleaned" ]]; then
+                echo "Setze ACLs für Transfer-Unterordner: $dir"
+                echo "$acl_transfer_cleaned" | setfacl --set-file=- "$dir"
+            fi
+        else
+            echo "Setze ACLs für normalen Unterordner: $dir"
+            echo "$acl_user_folder_cleaned" | setfacl --set-file=- "$dir"
+        fi
+    done
+
+    # ACLs für Dateien setzen (inkl. Transfer)
+    find "$user_folder" -mindepth 1 -type f | while read -r file; do
+        if [[ "$file" == "$transfer_folder"* ]]; then
+            if [[ -n "$acl_transfer_cleaned" ]]; then
+                acl_transfer_file_cleaned=$(clean_acl "$acl_transfer_cleaned" "file")
+                echo "Setze ACLs für Transfer-Datei: $file"
+                echo "$acl_transfer_file_cleaned" | setfacl --set-file=- "$file"
+            fi
+        else
+            acl_user_file_cleaned=$(clean_acl "$acl_user_folder_cleaned" "file")
+            echo "Setze ACLs für normale Datei: $file"
+            echo "$acl_user_file_cleaned" | setfacl --set-file=- "$file"
+        fi
+    done
+}
+
+# Funktion zum Setzen der ACLs für Share-Ordner
+set_acls_for_share_folder() {
+    local base_folder="$1"
+
+    # Durchlaufe alle Unterordner in diesem Share-Bereich
+    for main_folder in "$base_folder"/*; do
+        echo "Verarbeite Unterordner: $main_folder"
+        if [[ -d "$main_folder" ]]; then
+            acl_main=$(getfacl -p "$main_folder" 2>/dev/null)
+            if [[ -z "$acl_main" ]]; then
+                echo "Fehler: Kann ACL von $main_folder nicht abrufen!"
+                continue
+            fi
+            acl_main_cleaned=$(clean_acl "$acl_main" "dir")
+
+            # Setze ACLs für alle Unterordner und Dateien
+            find "$main_folder" -mindepth 1 -type d | while read -r dir; do
+                echo "Setze ACLs für Unterordner von $main_folder: $dir"
+                echo "$acl_main_cleaned" | setfacl --set-file=- "$dir"
+            done
+
+            find "$main_folder" -mindepth 1 -type f | while read -r file; do
+                acl_main_file_cleaned=$(clean_acl "$acl_main_cleaned" "file")
+                echo "Setze ACLs für Datei in $main_folder: $file"
+                echo "$acl_main_file_cleaned" | setfacl --set-file=- "$file"
+            done
+        fi
+    done
+}
+
+# Funktion zum Setzen der ACLs für Flache-Share-Ordner
+set_acls_for_flat_share_folder() {
+    local base_folder="$1"
+
+    if [[ -d "$base_folder" ]]; then
+        acl_base=$(getfacl -p "$base_folder" 2>/dev/null)
+        if [[ -z "$acl_base" ]]; then
+            echo "Fehler: Kann ACL von $base_folder nicht abrufen!"
+            continue
+        fi
+        acl_base_cleaned=$(clean_acl "$acl_base" "dir")
+
+        # Setze ACLs für alle Unterordner und Dateien
+        find "$base_folder" -mindepth 1 -type d | while read -r dir; do
+            echo "Setze ACLs für Unterordner von $base_folder: $dir"
+            echo "$acl_base_cleaned" | setfacl --set-file=- "$dir"
+        done
+
+        find "$base_folder" -mindepth 1 -type f | while read -r file; do
+            acl_base_file_cleaned=$(clean_acl "$acl_base_cleaned" "file")
+            echo "Setze ACLs für Datei in $base_folder: $file"
+            echo "$acl_base_file_cleaned" | setfacl --set-file=- "$file"
+        done
+    fi
+}
+
+
+# Verarbeitung der Lehrerordner
+if [[ -d "$TEACHERS_DIR" ]]; then
+    for teacher_folder in "$TEACHERS_DIR"/*; do
+        if [[ -d "$teacher_folder" ]]; then
+            echo "Verarbeite Lehrerordner: $teacher_folder"
+            set_acls_for_user_folder "$teacher_folder"
+        fi
+    done
+else
+    echo "Fehler: Lehrer-Verzeichnis $TEACHERS_DIR existiert nicht!"
+fi
+
+ Verarbeitung der Schülerordner mit Klassenstruktur
+if [[ -d "$STUDENTS_DIR" ]]; then
+    for class_folder in "$STUDENTS_DIR"/*; do
+        if [[ -d "$class_folder" ]]; then
+            for student_folder in "$class_folder"/*; do
+                if [[ -d "$student_folder" ]]; then
+                    echo "Verarbeite Schülerordner: $student_folder"
+                    set_acls_for_user_folder "$student_folder"
+                fi
+            done
+        fi
+    done
+else
+    echo "Fehler: Schüler-Verzeichnis $STUDENTS_DIR existiert nicht!"
+fi
+
+ Verarbeitung der Share-Ordner
+if [[ -d "$SHARE_DIR" ]]; then
+    # Verarbeitung der Klassen- und Projekt-Ordner
+    for subdir in "classes" "projects"; do
+        if [[ -d "$SHARE_DIR/$subdir" ]]; then
+            echo "Verarbeite Share-Unterverzeichnis: $SHARE_DIR/$subdir"
+            set_acls_for_share_folder "$SHARE_DIR/$subdir"
+        fi
+    done
+    # Verarbeitung der School- und Teacher-Ordner (keine extra Unterstrukturen)
+    for simple_dir in "school" "teachers" "management"; do
+        if [[ -d "$SHARE_DIR/$simple_dir" ]]; then
+            echo "Setze ACLs direkt für $SHARE_DIR/$simple_dir"
+            set_acls_for_flat_share_folder "$SHARE_DIR/$simple_dir"
+        fi
+    done
+fi
+
+echo "Berechtigungen erfolgreich gesetzt!"
