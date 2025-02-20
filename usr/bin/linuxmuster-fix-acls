@@ -173,7 +173,7 @@ else
     echo "Fehler: Lehrer-Verzeichnis $TEACHERS_DIR existiert nicht!"
 fi
 
- Verarbeitung der Schülerordner mit Klassenstruktur
+# Verarbeitung der Schülerordner mit Klassenstruktur
 if [[ -d "$STUDENTS_DIR" ]]; then
     for class_folder in "$STUDENTS_DIR"/*; do
         if [[ -d "$class_folder" ]]; then
@@ -189,7 +189,7 @@ else
     echo "Fehler: Schüler-Verzeichnis $STUDENTS_DIR existiert nicht!"
 fi
 
- Verarbeitung der Share-Ordner
+# Verarbeitung der Share-Ordner
 if [[ -d "$SHARE_DIR" ]]; then
     # Verarbeitung der Klassen- und Projekt-Ordner
     for subdir in "classes" "projects"; do
