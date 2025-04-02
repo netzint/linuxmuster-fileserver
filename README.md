@@ -11,7 +11,6 @@ This tool installs a file server and joins it to the Linuxmuster server's AD. Th
 - Performance improvement (see [Performance improvement](#performance-improvement))
 
 ## Maintenance Details
-<div align="center">
 Linuxmuster.net official | ✅  YES
 :---: | :---: 
 [Community support](https://ask.linuxmuster.net) | ✅  YES*
@@ -20,7 +19,6 @@ Maintainer organisation |  Linuxmuster.NET
 Primary maintainer | lukas.spitznagel@netzint.de  
     
 \* The linuxmuster community consist of people who are nice and happy to help. They are not directly involved in the development though, and might not be able to help in all cases.
-</div>
 
 ## Installation
 
