@@ -29,6 +29,9 @@ if [[ -z $1 ]]; then
   exit 1
 fi
 
+read -p "This will overwrite all permissions on the file system. Please only run this command if 'sophomorix-repair' has been run on the school server beforehand! (y/n) " input
+[[ "$input" =~ ^[Yy]$ ]] || exit 1
+
 # Basisverzeichnisse
 TEACHERS_DIR="/srv/samba/schools/$1/teachers"
 STUDENTS_DIR="/srv/samba/schools/$1/students"

@@ -2,7 +2,7 @@
 
 #########################################################
 # 
-# by Netzint GmbH 2023
+# by Netzint GmbH 2025
 # Lukas Spitznagel (lukas.spitznagel@netzint.de)
 # 
 #########################################################
@@ -15,10 +15,30 @@ import os
 
 from subprocess import PIPE
 
-def __execute(command):
+def __execute(command) -> subprocess.CompletedProcess:
+    """
+    Execute a command and return a subprocess.CompletedProcess object
+
+    Args:
+        command (list): List of strings representing the command to execute
+
+    Returns:
+        subprocess.CompletedProcess: The result of the execution
+    """
     return subprocess.run(command, stdout=PIPE, stderr=PIPE)
 
-def status():
+def status() -> str:
+    """
+    Check and return the status of the linuxmuster-fileserver services.
+
+    This function checks the status of the 'smbd' and 'winbind' services
+    using systemctl and returns a string indicating whether each service
+    is running or inactive.
+
+    Returns:
+        str: A string message indicating the status of the 'smbd' and 'winbind' services.
+    """
+
     smbdstatus = __execute(["/usr/bin/systemctl", "status", "smbd"])
     winbindstatus = __execute(["/usr/bin/systemctl", "status", "winbind"])
     
@@ -36,7 +56,27 @@ def status():
 
     return result
 
-def setup(domain, username, password, school):
+def setup(domain, username, password, school) -> str:
+    """
+    Setup the linuxmuster-fileserver configuration and join the domain.
+
+    This function performs several setup tasks for the linuxmuster-fileserver:
+    1. Configures kerberos, nsswitch, and samba by copying template files and replacing placeholders.
+    2. Joins the server to the Active Directory domain using provided credentials.
+    3. Creates a new share for the specified school and configures its parameters.
+    4. Initializes and enables quotas for the school's share directory.
+    5. Restarts the 'smbd' and 'winbind' services to apply changes.
+
+    Args:
+        domain (str): The domain name for the fileserver (e.g., linuxmuster.lan).
+        username (str): The username with join permissions.
+        password (str): The password corresponding to the username.
+        school (str): The school shortcut for the fileserver share.
+
+    Returns:
+        str: A message indicating successful completion of the setup process.
+    """
+
     workgroup = domain.split(".")[0]
     print()
     print("Copy template for new krb5.conf... ", end="")
@@ -125,10 +165,9 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     parserSetup = subparsers.add_parser("setup", help="Setup a new fileserver")
     parserSetup.add_argument("-d", "--domain", required=False, help='Linuxmuster domain name (eg. linuxmuster.lan)', default="linuxmuster.lan")
-    #parserSetup.add_argument("-w", "--workgroup", required=True, help='Linuxmuster workgroup')
     parserSetup.add_argument("-u", "--username", required=False, help='Username of user with join permissions', default="global-admin")
     parserSetup.add_argument("-p", "--password", required=False, help='Password of user with join permissions')
-    parserSetup.add_argument("-s", "--school", required=True, help='Schoolshortcut for this fileserver')
+    parserSetup.add_argument("-s", "--school", required=False, help='Schoolshortcut for this fileserver', default="default-school")
 
     subparsers.add_parser("status", help="Status of caching server(s)")
 
